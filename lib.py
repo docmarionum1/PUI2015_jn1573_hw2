@@ -19,27 +19,31 @@ def send_request(apikey, busline):
     else:
         response = requests.get(URL % (apikey, busline))
         data = response.json()
-        
+
         # Make sure request was correct
         if 'ErrorCondition' in data['Siri']['ServiceDelivery']['VehicleMonitoringDelivery'][0]:
             sys.exit('ERROR : ' + data['Siri']['ServiceDelivery']['VehicleMonitoringDelivery'][0]['ErrorCondition']['Description'])
-            
+
+        # Write response to cache on disk for future requests sooner than
+        # RATE_LIMIT.
         with open(CACHE_FILE, 'wb') as f:
             f.write(response.text)
-            
+
     return data
-    
+
 def use_cache(busline):
+    # If the file doesn't exist or is older than RATE_LIMIT don't use cache
     if not path.exists(CACHE_FILE):
         return False
     elif (time.time() - path.getmtime(CACHE_FILE)) > RATE_LIMIT:
         return False
-        
+
     # Check if cached file matches requested Bus line
+    # If it doesn't match exit with an error
     with open(CACHE_FILE, 'r') as f:
         data = json.load(f)
         if data['Siri']['ServiceDelivery']['VehicleMonitoringDelivery'][0]['VehicleActivity'][0]['MonitoredVehicleJourney']['PublishedLineName'] != busline:
             sys.exit("ERROR: %s does not match cached data.  Try again in %s seconds" % (busline, RATE_LIMIT - int(time.time() - path.getmtime(CACHE_FILE))))
 
+    # Use the cached file
     return True
-        
